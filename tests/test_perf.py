@@ -1,10 +1,9 @@
 import time
+from PIL import Image
 from swin_classifier.infrastructure.image_loader import LocalImageLoader
 from swin_classifier.infrastructure.hf_adapter import HuggingFaceSwinClassifier
 from swin_classifier.application.classify_use_case import ClassifyImageService
 
-
-from PIL import Image
 
 def test_inference_latency(sample_image: Image.Image) -> None:
     """
