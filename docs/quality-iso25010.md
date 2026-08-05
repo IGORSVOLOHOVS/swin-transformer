@@ -32,10 +32,33 @@ would pass every test in this suite.
 
 *Time behaviour, resource use, capacity.*
 
-`tests/test_perf.py` measures end-to-end inference latency and fails above
-1000 ms; the README quotes ~100 ms on CPU, and the measured figure on this
-machine is consistent with that. `scripts/profile_application.py` attributes
-time to individual functions when the number moves.
+`benchmarks/test_pipeline_performance.py` measures everything the pipeline does
+*around* the model — the part a change to this repository can actually make
+slower. Measured on this machine:
+
+| Operation | Median |
+| --- | --- |
+| Load a 64 × 64 PNG | 119 µs |
+| Load a 224 × 224 PNG | 631 µs |
+| Load a 1024 × 1024 PNG | 14.0 ms |
+| Missing file (failure path) | 12.9 µs |
+| Use case: load + orchestrate, model stubbed | 643 µs |
+
+Two things fall out of those numbers. The use case costs 643 µs against 631 µs
+for the load alone, so the layering — ports, Result objects, the service
+indirection — adds about **2 %**; the architecture is not what is slow.
+And decoding is linear in image area, so a 1024 × 1024 input spends 14 ms
+before the model starts. Callers feeding large images should downscale first.
+
+The failure path costs 12.9 µs, fifty times less than a successful load: a
+missing file is a `Path.exists()` check, not an exception unwind.
+
+`tests/test_perf.py` also times inference end to end and fails above 1000 ms.
+That is a guard rail rather than a measurement — one `perf_counter` call, no
+warm-up, no repetitions — and it covers the model, which these benchmarks
+deliberately exclude because loading weights would measure the network.
+`scripts/profile_application.py` attributes time to individual functions when a
+number moves.
 
 Swin-Tiny computes attention inside shifted local windows instead of across the
 whole image, which is the architectural reason CPU inference is viable at all.
