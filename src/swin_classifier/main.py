@@ -1,12 +1,13 @@
 import sys
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.traceback import install
 
-from .infrastructure.image_loader import LocalImageLoader
-from .infrastructure.hf_adapter import HuggingFaceSwinClassifier
 from .application.classify_use_case import ClassifyImageService
+from .infrastructure.hf_adapter import HuggingFaceSwinClassifier
+from .infrastructure.image_loader import LocalImageLoader
 
 # Ensure UTF-8 output for Windows compatibility (rich icons)
 if sys.stdout.encoding.lower() != "utf-8":
@@ -53,9 +54,7 @@ def run_classification(image_path: str) -> None:
 
     for i, pred in enumerate(classification.predictions, 1):
         bar = "█" * int(pred.confidence * 20)
-        table.add_row(
-            str(i), pred.label, f"{pred.confidence:.4f}", f"[blue]{bar}[/blue]"
-        )
+        table.add_row(str(i), pred.label, f"{pred.confidence:.4f}", f"[blue]{bar}[/blue]")
 
     console.print(table)
     console.print(
@@ -67,9 +66,11 @@ def run_classification(image_path: str) -> None:
     )
 
 
+def main() -> None:
+    """Console entry point declared in pyproject.toml as `swin-classify`."""
+    image_path = sys.argv[1] if len(sys.argv) > 1 else "data/image.png"
+    run_classification(image_path)
+
+
 if __name__ == "__main__":
-    # Internal entry point - usually called by root classify_image.py
-    if len(sys.argv) > 1:
-        run_classification(sys.argv[1])
-    else:
-        run_classification("data/image.png")
+    main()

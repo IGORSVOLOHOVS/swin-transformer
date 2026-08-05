@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from ..domain.interfaces import ClassifierPort, ImageLoaderPort
 from ..domain.models import ClassificationResult
 from ..result import Result

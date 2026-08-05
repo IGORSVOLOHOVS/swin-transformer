@@ -1,5 +1,7 @@
 from pathlib import Path
+
 from PIL import Image
+
 from ..domain.interfaces import ImageLoaderPort
 from ..result import Result
 

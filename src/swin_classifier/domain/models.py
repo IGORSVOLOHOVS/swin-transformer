@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List
 
 
 @dataclass(frozen=True)
@@ -15,7 +14,7 @@ class Prediction:
 class ClassificationResult:
     """Entity representing the result of a classification task."""
 
-    predictions: List[Prediction]
+    predictions: list[Prediction]
     top_prediction: Prediction
 
 

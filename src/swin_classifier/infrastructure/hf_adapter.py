@@ -1,6 +1,7 @@
 import torch
-from transformers import AutoImageProcessor, AutoModelForImageClassification
 from PIL import Image
+from transformers import AutoImageProcessor, AutoModelForImageClassification
+
 from ..domain.interfaces import ClassifierPort
 from ..domain.models import ClassificationResult, Prediction
 from ..result import Result
@@ -14,8 +15,10 @@ class HuggingFaceSwinClassifier(ClassifierPort):
 
     def __init__(self, model_name: str = "microsoft/swin-tiny-patch4-window7-224"):
         self.model_name = model_name
-        # Pre-loading to keep classify call focused
-        self._processor = AutoImageProcessor.from_pretrained(model_name)
+        # Pre-loading to keep classify call focused.
+        # transformers ships no annotations for from_pretrained, so mypy --strict
+        # reports the call as untyped; the ignore is scoped to that one fact.
+        self._processor = AutoImageProcessor.from_pretrained(model_name)  # type: ignore[no-untyped-call]
         self._model = AutoModelForImageClassification.from_pretrained(model_name)
 
     def classify(self, image: Image.Image) -> Result[ClassificationResult, Exception]:
@@ -38,16 +41,14 @@ class HuggingFaceSwinClassifier(ClassifierPort):
 
             predictions = []
             for i in range(top_k):
-                idx = top_indices[0][i].item()
-                label = self._model.config.id2label[idx]
-                score = top_probs[0][i].item()
-                predictions.append(
-                    Prediction(class_index=idx, label=label, confidence=score)
-                )
+                # Tensor.item() is typed as returning int | float | bool, so the
+                # index has to be narrowed before it can be a class_index.
+                idx = int(top_indices[0][i].item())
+                label = str(self._model.config.id2label[idx])
+                score = float(top_probs[0][i].item())
+                predictions.append(Prediction(class_index=idx, label=label, confidence=score))
 
-            result = ClassificationResult(
-                predictions=predictions, top_prediction=predictions[0]
-            )
+            result = ClassificationResult(predictions=predictions, top_prediction=predictions[0])
 
             return Result.success(result)
 

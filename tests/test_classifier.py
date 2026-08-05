@@ -1,8 +1,10 @@
-import pytest
 from pathlib import Path
-from swin_classifier.result import Result
+
+import pytest
+
 from swin_classifier.domain.models import Prediction
 from swin_classifier.infrastructure.image_loader import LocalImageLoader
+from swin_classifier.result import Result
 
 
 def test_result_success() -> None:

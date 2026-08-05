@@ -1,8 +1,10 @@
-from typing import Protocol, runtime_checkable
 from pathlib import Path
+from typing import Protocol, runtime_checkable
+
 from PIL.Image import Image
-from .models import ClassificationResult
+
 from ..result import Result
+from .models import ClassificationResult
 
 
 @runtime_checkable

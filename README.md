@@ -1,5 +1,11 @@
 # Swin Transformer Image Classifier
 
+[![CI](https://github.com/IGORSVOLOHOVS/swin-transformer/actions/workflows/ci.yml/badge.svg)](https://github.com/IGORSVOLOHOVS/swin-transformer/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Coverage 95%](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](docs/quality-iso25010.md)
+
+
 A professional, domain-driven Python implementation of image classification using the Swin Transformer (`microsoft/swin-tiny-patch4-window7-224`).
 
 ## 🚀 Key Features
@@ -81,3 +87,41 @@ $env:PYTHONPATH='src'; python -m pytest tests/test_perf.py -s
 
 ## 📝 License
 MIT
+
+## 🖥️ Real output
+
+![CLI output](docs/screenshots/cli-output.png)
+
+Captured from an actual run, not mocked up. Regenerate it with
+`python scripts/capture_usage_screenshots.py`.
+
+## 📦 Install and run
+
+```bash
+pip install -e .
+swin-classify data/image.png      # or any path
+swin-classify                     # uses the bundled sample
+```
+
+## ✅ Quality
+
+| Control | Command | In CI |
+| --- | --- | --- |
+| Tests and coverage | `pytest --cov` | yes, fails below 90% |
+| Lint and format | `ruff check . && ruff format .` | yes |
+| Types | `mypy` | yes, `--strict` over `src/` |
+| Secret scan | `gitleaks` | yes, over full history |
+| Branch policy | `python scripts/enforce_branch_policy.py` | yes |
+
+Assessment against ISO/IEC 25010, including the gaps:
+[`docs/quality-iso25010.md`](docs/quality-iso25010.md).
+Design and its trade-offs: [`docs/architecture.md`](docs/architecture.md).
+
+## 🌿 Branches
+
+Exactly three: `release`, `dev`, `test`. See
+[`docs/branching.md`](docs/branching.md).
+
+## 📄 License
+
+MIT - see [`LICENSE`](LICENSE). Copyright (c) 2026 Igors Volohovs.
