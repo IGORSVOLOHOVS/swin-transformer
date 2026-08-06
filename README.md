@@ -85,6 +85,33 @@ $env:PYTHONPATH='src'; python -m pytest tests/test_perf.py -s
 - **Avg Latency**: ~101 ms
 - **Confidence**: Structured Top-5 output.
 
+### Everything around the model
+
+Inference is the model's cost, not this repository's. What a change here can
+actually make slower is the work surrounding it, measured by
+`benchmarks/test_pipeline_performance.py` — median of many rounds:
+
+| What is measured | Median |
+| --- | ---: |
+| Load and decode a 64 × 64 PNG | 156.3 µs |
+| Load and decode a 224 × 224 PNG | 830.1 µs |
+| Load and decode a 1024 × 1024 PNG | 15.79 ms |
+| Missing file — the failure path | 13.0 µs |
+| Use case: load + orchestrate, model stubbed | 746.0 µs |
+
+Two things fall out of these numbers. The use case costs 746 µs against 830 µs
+for the load it contains, so the layering — ports, `Result` objects, the service
+indirection — is lost in the noise of decoding: **the architecture is not what
+is slow.** And decoding is linear in image area, so a 1024 × 1024 input spends
+~16 ms before the model sees anything; downscale large inputs first.
+
+The failure path costs 13 µs, sixty times less than a successful load, because a
+missing file is a `Path.exists()` check rather than an exception unwind.
+
+```bash
+pytest benchmarks --benchmark-only
+```
+
 ## 📝 License
 MIT
 

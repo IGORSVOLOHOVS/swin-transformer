@@ -38,19 +38,21 @@ slower. Measured on this machine:
 
 | Operation | Median |
 | --- | --- |
-| Load a 64 × 64 PNG | 119 µs |
-| Load a 224 × 224 PNG | 631 µs |
-| Load a 1024 × 1024 PNG | 14.0 ms |
-| Missing file (failure path) | 12.9 µs |
-| Use case: load + orchestrate, model stubbed | 643 µs |
+| Load a 64 × 64 PNG | 156.3 µs |
+| Load a 224 × 224 PNG | 830.1 µs |
+| Load a 1024 × 1024 PNG | 15.79 ms |
+| Missing file (failure path) | 13.0 µs |
+| Use case: load + orchestrate, model stubbed | 746.0 µs |
 
-Two things fall out of those numbers. The use case costs 643 µs against 631 µs
-for the load alone, so the layering — ports, Result objects, the service
-indirection — adds about **2 %**; the architecture is not what is slow.
-And decoding is linear in image area, so a 1024 × 1024 input spends 14 ms
-before the model starts. Callers feeding large images should downscale first.
+Two things fall out of those numbers. The use case measures at 746 µs against
+830 µs for the load it contains — the two are within run-to-run noise of each
+other, which is the finding: the layering (ports, Result objects, the service
+indirection) costs less than the variance of decoding a PNG. **The architecture
+is not what is slow.** And decoding is linear in image area, so a 1024 × 1024
+input spends ~16 ms before the model starts; callers feeding large images should
+downscale first.
 
-The failure path costs 12.9 µs, fifty times less than a successful load: a
+The failure path costs 13.0 µs, sixty times less than a successful load: a
 missing file is a `Path.exists()` check, not an exception unwind.
 
 `tests/test_perf.py` also times inference end to end and fails above 1000 ms.
