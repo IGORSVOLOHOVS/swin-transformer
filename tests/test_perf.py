@@ -1,8 +1,13 @@
 import time
 
+import pytest
 from PIL import Image
 
 from swin_classifier.infrastructure.hf_adapter import HuggingFaceSwinClassifier
+
+# The one test that loads the real weights, so `addopts` leaves it out of every gate.
+# Run it by hand: uv run --frozen python -m pytest -m model --no-cov -s
+pytestmark = pytest.mark.model
 
 
 def test_inference_latency(sample_image: Image.Image) -> None:

@@ -47,11 +47,7 @@ def build_executable(version: str) -> Path:
         check=False,
     )
     if probe.returncode != 0:
-        raise SystemExit(
-            "PyInstaller is not installed. Run:\n"
-            "  python scripts/install_dependencies.py --dev\n"
-            '  pip install -e ".[release]"'
-        )
+        raise SystemExit("PyInstaller is not installed. Run:\n  uv sync --frozen --extra release")
     print(f"PyInstaller {probe.stdout.strip()}")
 
     work = ROOT / "build" / "pyinstaller"

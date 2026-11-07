@@ -56,7 +56,7 @@ def measure_tests() -> Metric:
     # `-o addopts=` clears the -q already set in pyproject.toml. Without this the
     # two combine into -qq, which suppresses the "N passed" summary line that
     # this function parses, and every run silently reports zero tests.
-    proc = run(sys.executable, "-m", "pytest", "-o", "addopts=", "--tb=no", "-q")
+    proc = run(sys.executable, "-m", "pytest", "-o", "addopts=", "-m", "not model", "--tb=no", "-q")
     text = proc.stdout + proc.stderr
     passed = int(m.group(1)) if (m := re.search(r"(\d+) passed", text)) else 0
     failed = int(m.group(1)) if (m := re.search(r"(\d+) failed", text)) else 0
@@ -77,6 +77,8 @@ def measure_coverage() -> Metric:
         "pytest",
         "-o",
         "addopts=",
+        "-m",
+        "not model",
         "--cov",
         "--cov-report=json:.coverage.json",
         "--tb=no",
@@ -144,10 +146,10 @@ def measure_portability() -> Metric:
     requires = (
         m.group(1) if (m := re.search(r'requires-python\s*=\s*"([^"]+)"', pyproject)) else "?"
     )
-    ci = ROOT / ".github" / "workflows" / "ci.yml"
+    ci = ROOT / ".gitea" / "workflows" / "test.yaml"
     ci_text = ci.read_text(encoding="utf-8") if ci.is_file() else ""
-    operating_systems = sorted(set(re.findall(r"(ubuntu|windows|macos)-latest", ci_text)))
-    versions = sorted(set(re.findall(r'"(3\.\d+)"', ci_text)))
+    operating_systems = sorted(set(re.findall(r"runs-on: (ubuntu|windows|macos)", ci_text)))
+    versions = sorted(set(re.findall(r">=(3\.\d+)", requires)))
     # Two OSes and two interpreter versions is the bar for "portable enough".
     score = min(100.0, 25.0 * len(operating_systems) + 25.0 * len(versions))
     return {

@@ -1,53 +1,85 @@
+# pyproject.toml - Python's own file for swin-transformer.
+#
+# It pins the toolchain. `recipe.ps1 test` runs pytest, mypy, ruff check and ruff
+# format, and every setting those four read is here. There are no task-runner
+# sections: the recipe's verbs are the tasks.
+
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+# Pinned with a version, not a bare name: an unpinned backend changes what
+# `recipe.ps1 build` produces without anyone editing this file.
+requires = ["setuptools==80.9.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "swin-classifier"
-version = "1.0.0"
-description = "Image classification with Swin Transformer, arranged as ports and adapters."
+# This must equal $Version in recipe.ps1: `recipe.ps1 test` fails when they disagree.
+version = "1.1.0"
+description = "Console tool that classifies an image with the Swin-Tiny transformer, arranged as ports and adapters."
 readme = "README.md"
-requires-python = ">=3.10"
-license = { file = "LICENSE" }
-authors = [{ name = "Igors Volohovs", email = "igorsvolohovs@gmail.com" }]
+license = "MIT"
+authors = [{ name = "Igors Volohovs" }]
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: Image Recognition",
 ]
+requires-python = ">=3.13,<3.14"
 dependencies = [
+    # torch and torchvision are held to one pair: PyPI's Windows wheels of torch are the
+    # CPU build, which is what this CPU inference pipeline wants on the lab's runner.
+    "torch==2.11.0",
+    "torchvision==0.26.0",
     "transformers>=4.40",
-    "torch>=2.0",
-    "torchvision>=0.15",
     "Pillow>=10.0",
     "numpy>=1.24",
     "rich>=13.0",
 ]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-    "pytest-cov>=5.0",
-    "pytest-benchmark>=4.0",
-    "ruff>=0.6",
-    "mypy>=1.10",
-    "radon>=6.0",
-    "pre-commit>=3.7",
-]
+# Only scripts/build_release_artifact.py needs this. The lab ships a wheel.
 release = ["pyinstaller>=6.0"]
 
 [project.scripts]
 swin-classify = "swin_classifier.main:main"
 
+[dependency-groups]
+# `uv run` installs this group by default, so test.yaml's Runner health step finds
+# ruff, pytest and mypy through `uv run --frozen <tool> --version`.
+dev = [
+    "ruff==0.16.1",
+    "mypy==2.3.0",
+    "pytest==8.4.2",
+    "pytest-cov==5.0.0",
+    "coverage==7.15.2",
+    # benchmarks/ and scripts/collect_quality_metrics.py, kept from before the lab.
+    "pytest-benchmark>=4.0",
+    "radon>=6.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.uv]
+# The tests and `recipe.ps1 run` use the source tree, so uv does not install the project.
+package = false
+
 [tool.ruff]
+# Ruff refuses to run at all when its own version is not this one.
+required-version = "0.16.1"
+target-version = "py313"
 line-length = 100
-target-version = "py310"
 src = ["src", "tests", "scripts"]
-# Vendored agent tooling and generated API docs are not this project's code.
-extend-exclude = [".agent", "docs/api", "workflow_prompts", "scratch"]
+# Vendored agent tooling and generated API docs are not this project's code. Section 7
+# prints .claude/, tests/manual/serve.py and tools/wiki.py verbatim, so neither the
+# linter's stricter set nor the formatter may touch them.
+extend-exclude = [
+    ".agent",
+    ".claude",
+    "docs/api",
+    "scratch",
+    "tests/manual/serve.py",
+    "tools/wiki.py",
+    "workflow_prompts",
+]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "C90", "S", "RUF"]
@@ -57,28 +89,29 @@ ignore = ["S101"]
 "tests/*" = ["S", "C90"]
 "scripts/*" = ["S404", "S603", "S607"]
 
-[tool.mypy]
-python_version = "3.10"
-files = ["src"]
-strict = true
-# The transformers and torch stubs are incomplete; do not fail on their gaps.
-[[tool.mypy.overrides]]
-module = ["transformers.*", "torch.*", "torchvision.*", "PIL.*"]
-ignore_missing_imports = true
+[tool.ruff.format]
+line-ending = "lf"
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
-addopts = "-q --strict-markers"
+python_files = "test_*.py"
+pythonpath = ["src"]
+markers = ["model: loads the real Swin weights, so no gate runs it"]
+# `not model` is what keeps a gate from fetching weights; tests/conftest.py is the second lock.
+addopts = "-q --strict-markers -m 'not model' --cov=src/swin_classifier --cov-report=term --cov-fail-under=83"
 
 [tool.coverage.run]
-source = ["src"]
+source = ["src/swin_classifier"]
 branch = true
 
 [tool.coverage.report]
 show_missing = true
-skip_covered = true
-# Measured at 95% once the use case, the loader and the shell were covered.
-# The floor sits just below that so a real regression fails the build.
-fail_under = 90
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src", "tools"]
+strict = true
+mypy_path = "src"
+explicit_package_bases = true

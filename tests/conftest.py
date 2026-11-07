@@ -1,8 +1,14 @@
 import io
+import os
 
 import numpy as np
 import pytest
 from PIL import Image
+
+# huggingface_hub reads this once, on import, and nothing has imported it yet: conftest.py comes
+# first. A test that reaches for weights then fails on the spot instead of fetching them, however
+# pytest was started. `setdefault`, so a person can still fetch them with HF_HUB_OFFLINE=0.
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 
 @pytest.fixture
