@@ -1,127 +1,58 @@
-# Swin Transformer Image Classifier
+# swin-transformer
 
-[![CI](https://github.com/IGORSVOLOHOVS/swin-transformer/actions/workflows/ci.yml/badge.svg)](https://github.com/IGORSVOLOHOVS/swin-transformer/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
-[![Coverage 95%](https://img.shields.io/badge/coverage-95%25-brightgreen.svg)](docs/quality-iso25010.md)
+A console tool that classifies an image with the Swin Transformer (`microsoft/swin-tiny-patch4-window7-224`) on the CPU. It prints the five most likely ImageNet-1k labels with their scores and names the winner.
 
+The code is arranged as ports and adapters. The domain knows nothing about HuggingFace, the filesystem or the terminal, and failures travel as `Result` values rather than exceptions. `docs/architecture.md` explains the design and its trade-offs.
 
-A professional, domain-driven Python implementation of image classification using the Swin Transformer (`microsoft/swin-tiny-patch4-window7-224`).
+## Use
 
-## 🚀 Key Features
-- **Clean Architecture**: Strict separation of concerns (Domain, Application, Infrastructure).
-- **DDD Principles**: Ubiquitous language, Value Objects, Entities, and Ports/Adapters.
-- **Monadic Error Flow**: explicit error handling via `Result` pattern (no exceptions).
-- **Rich Observability**: Professional terminal UI and structured logging using `rich`.
-- **High Performance**: Optimized inference pipeline with a latency baseline of ~100ms on CPU.
-- **Strict Typing**: Python 3.10+ type hints with `mypy --strict` compliance.
+```powershell
+.\recipe.ps1 run                      # classifies the bundled data/image.png
+.\recipe.ps1 run path\to\image.png
+```
 
-## 📁 Structure
-- `src/swin_classifier/`
-  - `domain/`: Core models and interfaces (Protocols).
-  - `application/`: Use cases (ClassifyImageService).
-  - `infrastructure/`: External integrations (HuggingFace, Local IO).
-  - `main.py`: Entry point and CLI logic.
-  - `result.py`: Monadic Result type implementation.
-- `tests/`: Pytest suite with fixtures and performance benchmarks.
-- `docs/api/`: Auto-generated API documentation.
-
-## 🖼️ Example Result
-
-### Input Image
-![Classified Image](data/image.png)
-
-### Classification Output
 ```text
-🔍 Processing image: data/image.png
+Processing image: data/image.png
           Top-5 Classification Predictions
-┏━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━━━┓
-┃ Rank ┃ Label            ┃  Score ┃ Confidence Bar ┃
-┡━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━━━┩
+┌──────┬──────────────────┬────────┬────────────────┐
+│ Rank │ Label            │  Score │ Confidence Bar │
+├──────┼──────────────────┼────────┼────────────────┤
 │  1   │ ox               │ 0.5758 │ ███████████    │
 │  2   │ ram, tup         │ 0.0222 │                │
 │  3   │ kuvasz           │ 0.0093 │                │
 │  4   │ llama            │ 0.0082 │                │
 │  5   │ golden retriever │ 0.0056 │                │
 └──────┴──────────────────┴────────┴────────────────┘
-╭────────────────────────────╮
-│ 🏆 Winner: ox (Index: 345) │
-╰────────────────────────────╯
+Winner: ox (Index: 345)
 ```
 
-## 🛠️ Usage
+`docs/install.md` says what to install and `docs/manual.md` describes the arguments, the tests and the measurements. `.\recipe.ps1 test` runs the tests, mypy and ruff. It never needs the model: no gate fetches the weights.
 
-### Installation
-Ensure you have the dependencies installed:
-```bash
-pip install transformers torch Pillow numpy rich pdoc pytest
-```
+## What is here
 
-### Running Classification
-Classify the default image:
-```bash
-python classify_image.py
-```
+- `src/swin_classifier/` is the program: `domain/`, `application/`, `infrastructure/`, `result.py` and `main.py`.
+- `classify_image.py` starts it from the source tree.
+- `tests/` holds the tests. `benchmarks/` measures the work around the model.
+- `scripts/` holds the helpers kept from before the lab, among them `collect_quality_metrics.py`.
+- `docs/` holds the architecture, the ISO/IEC 25010 assessment, the branch model and the generated API pages in `docs/api/`.
+- `.agent/`, `workflow_prompts/` and `scratch/` are agent tooling that came with the repository. They are not this project's code, and nothing measures them.
 
-Classify a specific image:
-```bash
-python classify_image.py data/image.png
-```
+## Everything around the model
 
-### Testing & Quality
-Run unit tests:
-```bash
-$env:PYTHONPATH='src'; python -m pytest tests/
-```
+Inference is the model's cost, not this repository's. What a change here can actually make slower is the work surrounding it, measured by `benchmarks/test_pipeline_performance.py` as the median of many rounds on 2026-11-07:
 
-Run performance benchmarks:
-```bash
-$env:PYTHONPATH='src'; python -m pytest tests/test_perf.py -s
-```
+| What is measured | Median |
+| --- | ---: |
+| Load and decode a 64 x 64 PNG | 127.1 µs |
+| Load and decode a 224 x 224 PNG | 606.6 µs |
+| Load and decode a 1024 x 1024 PNG | 13.31 ms |
+| Missing file, the failure path | 12.6 µs |
+| Use case: load and orchestrate, model stubbed | 635.7 µs |
 
-## 📊 Performance Baseline
-- **Model**: Swin-Tiny
-- **Device**: CPU
-- **Avg Latency**: ~101 ms
-- **Confidence**: Structured Top-5 output.
+The use case costs about as much as the load it contains, so the layering is not what is slow. Decoding grows with image area, so a 1024 x 1024 input spends about 13 ms before the model sees anything: downscale large inputs first.
 
-## 📝 License
-MIT
+`docs/quality-iso25010.md` assesses the project against ISO/IEC 25010, including the gaps.
 
-## 🖥️ Real output
+## Licence
 
-![CLI output](docs/screenshots/cli-output.png)
-
-Captured from an actual run, not mocked up. Regenerate it with
-`python scripts/capture_usage_screenshots.py`.
-
-## 📦 Install and run
-
-```bash
-pip install -e .
-swin-classify data/image.png      # or any path
-swin-classify                     # uses the bundled sample
-```
-
-## ✅ Quality
-
-| Control | Command | In CI |
-| --- | --- | --- |
-| Tests and coverage | `pytest --cov` | yes, fails below 90% |
-| Lint and format | `ruff check . && ruff format .` | yes |
-| Types | `mypy` | yes, `--strict` over `src/` |
-| Secret scan | `gitleaks` | yes, over full history |
-| Branch policy | `python scripts/enforce_branch_policy.py` | yes |
-
-Assessment against ISO/IEC 25010, including the gaps:
-[`docs/quality-iso25010.md`](docs/quality-iso25010.md).
-Design and its trade-offs: [`docs/architecture.md`](docs/architecture.md).
-
-## 🌿 Branches
-
-Exactly three: `release`, `dev`, `test`. See
-[`docs/branching.md`](docs/branching.md).
-
-## 📄 License
-
-MIT - see [`LICENSE`](LICENSE). Copyright (c) 2026 Igors Volohovs.
+MIT, see `LICENSE`.
