@@ -1,5 +1,0 @@
-transformers
-torch
-torchvision
-Pillow
-numpy
