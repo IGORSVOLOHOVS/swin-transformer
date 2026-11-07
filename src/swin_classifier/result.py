@@ -1,11 +1,8 @@
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
-
-T = TypeVar("T")
-E = TypeVar("E")
+from typing import Any
 
 
-class Result(Generic[T, E]):
+class Result[T, E]:
     """
     A simple Result type for monadic error handling in Python.
     Provides Success(T) or Failure(E).
