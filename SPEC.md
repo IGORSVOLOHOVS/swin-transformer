@@ -1,0 +1,250 @@
+# swin-transformer — Software Requirements Specification
+
+Reverse-engineered from the code on branch `dev` at commit `c0c6d3a` on 2026-11-18.
+It states what the code does, not what it should do. Every requirement names its
+source; anything the code does not answer is in section 9. Documentation hub:
+[`docs/README.md`](docs/README.md).
+
+## 1. Purpose and scope
+
+The system classifies a single image file with the pretrained HuggingFace model
+`microsoft/swin-tiny-patch4-window7-224` and prints the five most probable classes in
+the terminal (`src/swin_classifier/main.py`, `src/swin_classifier/infrastructure/hf_adapter.py`).
+
+In scope:
+
+- the `swin-classify` CLI and the older `classify_image.py` entry point;
+- the use case, the two ports and their two adapters (filesystem, HuggingFace);
+- the `Result` value type and the domain dataclasses;
+- tests, benchmarks and the release build of a standalone executable.
+
+Out of scope (absent from the code): training or fine-tuning, batch classification,
+GPU execution, image sources other than a local path, any network service or GUI, model
+cache management (`docs/architecture.md:85-90`). `.agent/`, `workflow_prompts/` and
+`scratch/` are vendored AI-agent material, not part of the program
+(`docs/architecture.md:101-105` names the first two; `CHANGELOG.md:50-52`, all three).
+
+## 2. Context
+
+| Actor / system | Role | Source |
+| --- | --- | --- |
+| Command-line user | Passes an image path, reads the table and exit code | `main.py:69-72` |
+| Python caller | Uses `ClassifyImageService` with own port implementations | `application/classify_use_case.py:14` |
+| Local filesystem | Holds the image | `infrastructure/image_loader.py:18-21` |
+| HuggingFace hub / local cache | Supplies processor config and model weights via `from_pretrained` | `hf_adapter.py:21-22` |
+| GitHub Actions | Runs CI and the tag-triggered release | `.github/workflows/ci.yml`, `.github/workflows/release.yml` |
+
+Runtime: CPython `>=3.10` (`pyproject.toml:10`); CI uses 3.10 and 3.12 on
+`ubuntu-latest` and `windows-latest` (`ci.yml:46-49`) with CPU-only PyTorch wheels
+(`ci.yml:56-59`).
+
+## 3. Functional requirements
+
+### Command-line interface
+
+- **FR-1.** The system shall take the image path from the first command-line argument
+  and use `data/image.png` when no argument is given.
+  Source: `src/swin_classifier/main.py:69-72`, `classify_image.py:10-16`.
+  Verification: `test_main_defaults_to_the_bundled_image`, `test_main_takes_the_path_from_argv` (`tests/test_main_shell.py`).
+- **FR-2.** The system shall install the console command `swin-classify` bound to
+  `swin_classifier.main:main`.
+  Source: `pyproject.toml:39-40`. Verification: no test.
+- **FR-3.** On success the system shall print a table titled
+  "Top-5 Classification Predictions" with columns Rank, Label, Score (four decimals) and
+  Confidence Bar (`int(confidence * 20)` block characters), followed by a panel naming
+  the top label and its class index.
+  Source: `main.py:45-66`. Verification: `test_prints_the_table_on_success` (checks title, label, "Winner").
+- **FR-4.** When loading or classification returns a failure, the system shall print a
+  panel titled "Classification Failed" containing the error text and exit with status 1.
+  Source: `main.py:35-43`. Verification: `test_reports_and_exits_when_loading_fails`, `test_reports_and_exits_when_the_model_fails`.
+- **FR-5.** On import of `main.py` the system shall re-wrap standard output as UTF-8 when
+  its encoding is not UTF-8, and install a `rich` traceback handler that shows local
+  variables. Source: `main.py:12-19`. Verification: no test.
+
+### Image loading
+
+- **FR-6.** The loader shall return a failure holding `FileNotFoundError` with the path
+  in its message when the path does not exist.
+  Source: `infrastructure/image_loader.py:18-19`.
+  Verification: `test_missing_file_is_a_failure_not_an_exception`, `test_local_image_loader_missing_file`.
+- **FR-7.** The loader shall open an existing file with Pillow and return it converted
+  to RGB. Source: `image_loader.py:21-22`.
+  Verification: `test_loads_a_real_file`, `test_converts_to_rgb`.
+- **FR-8.** The loader shall return any exception raised while opening or converting as
+  a failure instead of raising it. Source: `image_loader.py:23-24`.
+  Verification: `test_a_file_that_is_not_an_image_fails_cleanly`, `test_a_directory_fails_cleanly`.
+
+### Use case
+
+- **FR-9.** `ClassifyImageService.execute` shall convert the path string to `Path`, call
+  the loader, and on a load failure return that error without calling the classifier.
+  Source: `application/classify_use_case.py:22-27`.
+  Verification: `test_converts_the_path_argument_to_a_path`, `test_load_failure_short_circuits`.
+- **FR-10.** On a successful load the service shall pass the image to the classifier and
+  return the classifier's `Result` unchanged. Source: `classify_use_case.py:29-33`.
+  Verification: `test_passes_the_loaded_image_to_the_classifier`, `test_returns_the_classification`, `test_classifier_failure_is_propagated`.
+
+### Classification adapter
+
+- **FR-11.** On construction the adapter shall load the image processor and the
+  classification model for `model_name`, default
+  `microsoft/swin-tiny-patch4-window7-224`, through transformers `from_pretrained`.
+  Source: `hf_adapter.py:16-22`. Verification: `test_inference_latency` (needs the model).
+- **FR-12.** The adapter shall preprocess the image to PyTorch tensors, run the model
+  without gradient tracking and apply softmax over the last logits dimension.
+  Source: `hf_adapter.py:30-36`. Verification: `test_inference_latency` (asserts success only).
+- **FR-13.** The adapter shall return the five highest-probability classes in descending
+  order as `Prediction(class_index, label, confidence)`, labels taken from the model's
+  `config.id2label`, with the first as `top_prediction`.
+  Source: `hf_adapter.py:39-51`. Verification: no test of content or order.
+- **FR-14.** The adapter shall return any exception raised during preprocessing,
+  inference or post-processing as a failure. Source: `hf_adapter.py:28,55-56`.
+  Verification: no test.
+
+### Result type and domain models
+
+- **FR-15.** `Result` shall provide `success`/`failure` constructors, `is_success`,
+  `is_failure`, `unwrap` (raises `ValueError` on a failure), `error` (raises
+  `ValueError` on a success), `map` (applied to successes only) and a `repr` showing the
+  state. Source: `src/swin_classifier/result.py:8-50`.
+  Verification: `TestResultSemantics`, `test_result_success`, `test_result_failure`.
+- **FR-16.** `Prediction`, `ClassificationResult` and `ImageMetadata` shall be immutable
+  (frozen dataclasses). Source: `domain/models.py:4-28`.
+  Verification: `test_prediction_is_frozen`, `test_classification_result_is_frozen`; `ImageMetadata`: no test.
+
+### Repository standard
+
+- **FR-17.** The repository shall carry the repo-quality-template tooling in its earlier
+  GitHub revision, adapted so that a `v*.*.*` tag runs `pytest` and builds a one-file
+  PyInstaller executable `swin-classify` from `src/swin_classifier/main.py`, a zip with
+  `README.md`, `LICENSE`, `CHANGELOG.md`, and a `.sha256` per file.
+  Source: `.github/workflows/release.yml:5-7,36-39`, `scripts/build_release_artifact.py:26-28,57-76,87-96,121-127`.
+  Verification: no test.
+
+### Declared but not implemented
+
+| Claim | Where | What the code does |
+| --- | --- | --- |
+| Error handling "via `Result` pattern (no exceptions)"; a model that will not download is a returned outcome | `README.md:14`, `docs/architecture.md:48-51` | `from_pretrained` runs in the constructor (`hf_adapter.py:21-22`), outside the `try` (`:28`); `main.py:28` does not catch it, so the exception propagates |
+| "Structured logging using `rich`" | `README.md:15` | No `logging` calls in `src/`; output is `rich` console printing only |
+| "Optimized inference pipeline" | `README.md:16` | No optimisation code beyond `torch.no_grad()` (`hf_adapter.py:33`) |
+| Screenshot regenerated by `scripts/capture_usage_screenshots.py` | `README.md:122-123` | The script runs `quality_template.cli` (`:131,173`), which does not exist here |
+| Profiling with `scripts/profile_application.py` | `docs/quality-iso25010.md:62-63` | Imports `quality_template.core` (`:22`), which does not exist here |
+| gitleaks in pre-commit; `requirements-dev.lock` | `SECURITY.md:14,18` | Neither present (`.pre-commit-config.yaml`, `git ls-files`) |
+| Weekly branch check in `branch-policy.yml` | `docs/branching.md:30-32` | No such file; job in `ci.yml:75-85` runs on push/PR |
+| Class id stored in variable `predicted_class_idx` | `docs/task.md:2` | No such variable; the id is printed in the "Winner" panel (`main.py:62`) |
+
+## 4. Interfaces
+
+### CLI
+
+| Command | Arguments | Output | Exit status |
+| --- | --- | --- | --- |
+| `swin-classify` (`pyproject.toml:40`) | `[IMAGE]`, first argument only; no options | `rich` status line, "Processing image" line, table, winner panel (`main.py:25-66`) | 0 on success; 1 on a returned failure (`main.py:43`); an exception during model construction propagates with a `rich` traceback |
+| `python classify_image.py` (`classify_image.py:10-20`) | same | same | same |
+
+### Python API
+
+| Element | Signature | Source |
+| --- | --- | --- |
+| `ImageLoaderPort` | `load_from_path(path: Path) -> Result[Image, Exception]` | `domain/interfaces.py:30-36` |
+| `ClassifierPort` | `classify(image: Image) -> Result[ClassificationResult, Exception]` | `domain/interfaces.py:10-27` |
+| `ClassifyImageService` | `__init__(loader, classifier)`; `execute(image_path: str) -> Result[ClassificationResult, Exception]` | `application/classify_use_case.py:14-18` |
+| `LocalImageLoader` | implements `ImageLoaderPort` | `infrastructure/image_loader.py:9-24` |
+| `HuggingFaceSwinClassifier` | `__init__(model_name: str = "microsoft/swin-tiny-patch4-window7-224")`; implements `ClassifierPort` | `infrastructure/hf_adapter.py:10-24` |
+| `run_classification` / `main` | `run_classification(image_path: str) -> None`; `main() -> None` | `main.py:22,69` |
+
+Both ports are `runtime_checkable` Protocols (`domain/interfaces.py:10,30`).
+
+## 5. Data
+
+| Entity | Fields | Source |
+| --- | --- | --- |
+| `Prediction` | `class_index: int`, `label: str`, `confidence: float` | `domain/models.py:4-10` |
+| `ClassificationResult` | `predictions: list[Prediction]`, `top_prediction: Prediction` | `domain/models.py:13-18` |
+| `ImageMetadata` | `width`, `height`, `channels: int`, `format: str` — defined, not used anywhere | `domain/models.py:21-28` |
+| `Result[T, E]` | value plus success flag | `result.py:8-16` |
+
+Storage: none of its own. Input is any file Pillow can open; `data/image.png` is the
+bundled sample (PNG, 1080 × 810, RGB, measured with Pillow). Model files live in the
+HuggingFace cache managed by transformers (`docs/architecture.md:74-81,90`). The release
+build writes `release/` and `build/pyinstaller/` (`build_release_artifact.py:26,57`).
+
+## 6. Non-functional requirements
+
+- **NFR-1.** Python `>=3.10`; tested on Ubuntu and Windows with Python 3.10 and 3.12.
+  Source: `pyproject.toml:10`, `ci.yml:46-49`.
+- **NFR-2.** Branch coverage of `src` shall be at least 90%. Source: `pyproject.toml:74-83`, `ci.yml:62`.
+- **NFR-3.** `src` shall pass `mypy --strict`, with missing-import errors ignored for
+  transformers, torch, torchvision and PIL. Source: `pyproject.toml:60-67`, `ci.yml:39-40`.
+- **NFR-4.** Code shall pass ruff rules `E W F I UP B SIM C90 S RUF` at line length 100
+  and `ruff format --check`. Source: `pyproject.toml:45-58`, `ci.yml:35-38`.
+- **NFR-5.** One `classify()` call on a 224 × 224 image shall take under 1000 ms (single
+  sample, no warm-up). Source: `tests/test_perf.py:16-26`. `README.md:85` reports an
+  average of about 101 ms on an unspecified CPU; that figure is not enforced.
+- **NFR-6.** Inference runs on CPU: no device selection exists in `src/`, CI installs
+  CPU wheels. Source: `hf_adapter.py`, `ci.yml:56-59`, `docs/architecture.md:87-88`.
+- **NFR-7.** Loading and orchestration cost is measured by pytest-benchmark at 64, 224
+  and 1024 px and for the missing-file path; no thresholds, not run in CI.
+  Source: `benchmarks/test_pipeline_performance.py:51-91`, `pyproject.toml:71`.
+- **NFR-8.** The first run needs access to the HuggingFace hub; the model is pinned by
+  name, not by revision. Source: `hf_adapter.py:16-22`, `docs/quality-iso25010.md:135-138`.
+
+## 7. Constraints and dependencies
+
+| Group | Packages (from `pyproject.toml`) |
+| --- | --- |
+| Build | `setuptools>=68`, `wheel` (`:2-3`) |
+| Runtime | `transformers>=4.40`, `torch>=2.0`, `torchvision>=0.15`, `Pillow>=10.0`, `numpy>=1.24`, `rich>=13.0` (`:18-25`) |
+| `dev` extra | `pytest>=8.0`, `pytest-cov>=5.0`, `pytest-benchmark>=4.0`, `ruff>=0.6`, `mypy>=1.10`, `radon>=6.0`, `pre-commit>=3.7` (`:28-36`) |
+| `release` extra | `pyinstaller>=6.0` (`:37`) |
+
+There is no lock file on `dev`. `requirements.txt` lists `transformers`, `torch`,
+`torchvision`, `Pillow`, `numpy` without versions and omits `rich`. `torchvision` is
+declared but not imported in `src/`. `.pre-commit-config.yaml:4` pins ruff `v0.4.1`,
+below the `ruff>=0.6` of the `dev` extra. Licence: MIT (`LICENSE`, `pyproject.toml:11`).
+
+## 8. Acceptance
+
+1. Install as CI does: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu`
+   and `pip install -e ".[dev]"` (`ci.yml:58-60`).
+2. `ruff check .`, `ruff format --check .`, `mypy` pass (`ci.yml:35-40`) — NFR-3, NFR-4.
+3. `pytest --cov --cov-report=term` passes with coverage at or above 90%
+   (`ci.yml:62`) — FR-1, FR-3 to FR-12, FR-15, FR-16, NFR-2, NFR-5. Needs network or a
+   warm HuggingFace cache for `tests/test_perf.py`.
+4. `pytest benchmarks --benchmark-only` completes (`README.md:112`) — NFR-7.
+5. Manual: from the repository root `swin-classify` prints the table for
+   `data/image.png`; `swin-classify missing.png` prints "Classification Failed" and
+   exits 1 — FR-1, FR-3, FR-4. `README.md:35-50` records `ox` (index 345, 0.5758) as
+   the top result for the sample; no test asserts it.
+6. FR-2, FR-5, FR-13 (content), FR-14 and FR-17 have no automated check.
+
+## 9. Open questions
+
+- Who the intended users are beyond the course exercise in `docs/task.md`, and whether
+  the project is still developed, is not stated.
+- `dev` (`c0c6d3a`) is 21 commits behind `origin/release` and `origin/test`, which hold
+  the template revision 4.0.0 work; `release` has its merge of 2026-11-07 (`ce22786`,
+  tag `v1.1.0`). The remote's default branch is `release` (`origin/HEAD`). Whether `dev`
+  should be brought up to date is not recorded. This spec covers `dev` only.
+- Whether a failed model download should be a returned failure (as `README.md:14` and
+  `docs/architecture.md:48-51` say) or an exception (as the code does).
+- Whether the default `data/image.png` should resolve relative to the working directory
+  (current behaviour) or to the package, given that the release zip does not include it.
+- The hardware behind "~101 ms" (`README.md:85`) and the benchmark medians in
+  `README.md:94-100`. Partly answered: the medians come from
+  `benchmarks/test_pipeline_performance.py` via pytest-benchmark (`README.md:90-92`),
+  measured 2026-08-05 (`docs/quality-iso25010.md:8`). No code computes an average
+  latency; the only latency printer is `tests/test_perf.py:22` (one call), which
+  `README.md:77-80` runs as the "performance benchmarks". The hardware is unknown.
+- Whether `ImageMetadata` and `Result.map` are kept for planned use; neither is used in `src/`.
+- Whether the model should be pinned to a revision (`docs/quality-iso25010.md:135-138`
+  names this as not done).
+- Which commit-message format applies: `CONTRIBUTING.md` (`feat:`) or the pre-commit
+  commit-msg check (`type(scope): Message.`, `.agent/scripts/check_commit_msg.py:31`).
+  In practice: the setup in `CONTRIBUTING.md:9` (`pre-commit install`) does not install
+  the `commit-msg` hook type, and `.pre-commit-config.yaml` sets no
+  `default_install_hook_types`, so the check does not run; the last eight commits on
+  `dev` use the `feat:` style. Which format is intended is not recorded.
+- Whether the course brief's requested model (`docs/task.md:2` says swin-tiny; its code
+  sample at `docs/task.md:8` uses `swin-base-patch4-window12-384`) was settled on purpose.
