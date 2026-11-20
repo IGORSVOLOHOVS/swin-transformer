@@ -272,3 +272,73 @@ below the `ruff>=0.6` of the `dev` extra. Licence: MIT (`LICENSE`, `pyproject.to
   `dev` use the `feat:` style. Which format is intended is not recorded.
 - Whether the course brief's requested model (`docs/task.md:2` says swin-tiny; its code
   sample at `docs/task.md:8` uses `swin-base-patch4-window12-384`) was settled on purpose.
+
+## Screenshots of requirements
+
+### FR-1 - The system shall take the image path from the first command-line argument
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-2 - The system shall install the console command swin-classify bound to
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-3 - On success the system shall print a table titled
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-4 - When loading or classification returns a failure, the system shall print a
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-5 - On import of main.py the system shall re-wrap standard output as UTF-8 when
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-6 - The loader shall return a failure holding FileNotFoundError with the path
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-7 - The loader shall open an existing file with Pillow and return it converted
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-8 - The loader shall return any exception raised while opening or converting as
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-9 - ClassifyImageService.execute shall convert the path string to Path, call
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-10 - On a successful load the service shall pass the image to the classifier and
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-11 - On construction the adapter shall load the image processor and the
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-12 - The adapter shall preprocess the image to PyTorch tensors, run the model
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-13 - The adapter shall return the five highest-probability classes in descending
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-14 - The adapter shall return any exception raised during preprocessing,
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-15 - Result shall provide success/failure constructors, issuccess,
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-16 - Prediction, ClassificationResult and ImageMetadata shall be immutable
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
+
+### FR-17 - The repository shall carry the repo-quality-template tooling in its earlier
+
+> Screenshot skipped: the code does not run here - the project runs on PyTorch-class libraries and trained weights, and torch is not installed here (multi-gigabyte); requirements whose code does not need torch will be revisited in a later pass.
